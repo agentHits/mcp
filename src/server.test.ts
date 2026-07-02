@@ -11,16 +11,21 @@ vi.mock("./utils/apiClient.js", () => ({
 }));
 
 const { default: apiClient } = await import("./utils/apiClient.js");
+const { generatedTools } = await import("./generated/tools.js");
 const { createServer } = await import("./server.js");
 
 describe("MCP server tools/list", () => {
   const originalDokployUrl = process.env.DOKPLOY_URL;
   const originalDokployApiKey = process.env.DOKPLOY_API_KEY;
+  const originalDokployRedactEnv = process.env.DOKPLOY_REDACT_ENV;
+  const originalDokployRedactFields = process.env.DOKPLOY_REDACT_FIELDS;
 
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.DOKPLOY_URL = "https://dokploy.example";
     process.env.DOKPLOY_API_KEY = "test-api-key";
+    process.env.DOKPLOY_REDACT_ENV = "false";
+    delete process.env.DOKPLOY_REDACT_FIELDS;
   });
 
   afterEach(() => {
@@ -34,6 +39,18 @@ describe("MCP server tools/list", () => {
       delete process.env.DOKPLOY_API_KEY;
     } else {
       process.env.DOKPLOY_API_KEY = originalDokployApiKey;
+    }
+
+    if (originalDokployRedactEnv === undefined) {
+      delete process.env.DOKPLOY_REDACT_ENV;
+    } else {
+      process.env.DOKPLOY_REDACT_ENV = originalDokployRedactEnv;
+    }
+
+    if (originalDokployRedactFields === undefined) {
+      delete process.env.DOKPLOY_REDACT_FIELDS;
+    } else {
+      process.env.DOKPLOY_REDACT_FIELDS = originalDokployRedactFields;
     }
   });
 
@@ -161,6 +178,132 @@ describe("MCP server tools/list", () => {
         (tool.inputSchema as Record<string, unknown>).type,
         `tool "${tool.name}" inputSchema is missing type`,
       ).toBe("object");
+    }
+  });
+
+  it("exposes application env upsert with partial-update inputs", async () => {
+    const tools = await getToolList();
+    const tool = tools.find((candidate) => candidate.name === "application-env-upsert");
+
+    expect(tool).toBeDefined();
+    expect(tool?.description).toBe("POST /application.env.upsert");
+
+    const schema = tool?.inputSchema as Record<string, unknown>;
+    const properties = schema.properties as Record<string, Record<string, unknown>>;
+
+    expect(schema.required).toEqual(["applicationId", "variables"]);
+    expect(properties.applicationId.type).toBe("string");
+    expect(properties.variables.type).toBe("object");
+    expect(properties.variables.additionalProperties).toMatchObject({
+      type: "string",
+    });
+    expect(properties.variables.propertyNames).toMatchObject({
+      pattern: "^[A-Za-z_][A-Za-z0-9_]*$",
+    });
+    expect(properties.redeploy.type).toBe("boolean");
+    expect(properties.dryRun.type).toBe("boolean");
+    expect(properties.expectedRevision.type).toBe("string");
+
+    const generatedTool = generatedTools.find(
+      (candidate) => candidate.name === "application-env-upsert",
+    );
+    expect(generatedTool).toBeDefined();
+    expect(
+      generatedTool?.schema.safeParse({
+        applicationId: "app_1",
+        variables: {
+          REDIS_PASSWORD: "placeholder-secret-value",
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      generatedTool?.schema.safeParse({
+        applicationId: "app_1",
+        variables: {},
+      }).success,
+    ).toBe(false);
+    expect(
+      generatedTool?.schema.safeParse({
+        applicationId: "app_1",
+        variables: {
+          "1_BAD": "placeholder-secret-value",
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("routes application env upsert without full environment replacement or raw value output", async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: {
+        applicationId: "app_1",
+        changed: true,
+        revision: "env:next",
+        dryRun: true,
+        redeployed: false,
+        variables: [
+          {
+            name: "REDIS_PASSWORD",
+            action: "updated",
+            secret: true,
+          },
+        ],
+      },
+    });
+
+    const client = await createConnectedClient();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await client.callTool({
+        name: "application-env-upsert",
+        arguments: {
+          applicationId: "app_1",
+          variables: {
+            REDIS_PASSWORD: "placeholder-secret-value",
+          },
+          dryRun: true,
+          redeploy: false,
+          expectedRevision: "env:current",
+        },
+      });
+
+      expect(apiClient.get).not.toHaveBeenCalled();
+      expect(apiClient.post).toHaveBeenCalledTimes(1);
+      expect(apiClient.post).toHaveBeenCalledWith("/application.env.upsert", {
+        applicationId: "app_1",
+        variables: {
+          REDIS_PASSWORD: "placeholder-secret-value",
+        },
+        dryRun: true,
+        redeploy: false,
+        expectedRevision: "env:current",
+      });
+      expect(apiClient.post).not.toHaveBeenCalledWith(
+        "/application.saveEnvironment",
+        expect.anything(),
+      );
+
+      const [, postBody] = vi.mocked(apiClient.post).mock.calls[0] as [
+        string,
+        Record<string, unknown>,
+      ];
+      expect(postBody).not.toHaveProperty("env");
+      expect(postBody).not.toHaveProperty("buildArgs");
+      expect(postBody).not.toHaveProperty("buildSecrets");
+      expect(postBody).not.toHaveProperty("createEnvFile");
+
+      const responseText = result.content
+        .map((item) => (item.type === "text" ? item.text : ""))
+        .join("\n");
+      const logText = consoleError.mock.calls.map((call) => String(call[0])).join("\n");
+
+      expect(responseText).toContain('"applicationId": "app_1"');
+      expect(responseText).toContain('"secret": true');
+      expect(responseText).not.toContain("placeholder-secret-value");
+      expect(logText).toContain('"REDIS_PASSWORD":"[REDACTED]"');
+      expect(logText).not.toContain("placeholder-secret-value");
+    } finally {
+      consoleError.mockRestore();
+      await client.close();
     }
   });
 });

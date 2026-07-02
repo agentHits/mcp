@@ -2,14 +2,14 @@
 
 > Auto-generated from the [Dokploy OpenAPI spec](https://docs.dokploy.com/openapi.json). Run `pnpm generate` to update.
 
-- **Total Tools**: 541
+- **Total Tools**: 542
 - **Categories**: 49
 
 ## Categories
 
 - [admin](#admin) (1 tools)
 - [ai](#ai) (12 tools)
-- [application](#application) (31 tools)
+- [application](#application) (32 tools)
 - [auditLog](#auditLog) (1 tools)
 - [backup](#backup) (12 tools)
 - [bitbucket](#bitbucket) (7 tools)
@@ -92,6 +92,7 @@
 | `application-start` | POST | `applicationId` (string) |
 | `application-redeploy` | POST | `applicationId` (string), `title`?, `description`? |
 | `application-saveEnvironment` | POST | `applicationId` (string), `env` (string | null), `buildArgs` (string | null), `buildSecrets` (string | null), `createEnvFile` (boolean) |
+| `application-env-upsert` | POST | `applicationId` (string), `variables` (object), `redeploy`?, `dryRun`?, `expectedRevision`? |
 | `application-saveBuildType` | POST | `applicationId` (string), `buildType` ("dockerfile" | "heroku_buildpacks" | "paketo_buildpacks" | "nixpacks" | "static" | "railpack"), `dockerfile` (string | null), `dockerContextPath` (string | null), `dockerBuildStage` (string | null), `herokuVersion` (string | null), `railpackVersion` (string | null), `publishDirectory`?, `isStaticSpa`? |
 | `application-saveGithubProvider` | POST | `applicationId` (string), `repository` (string | null), `owner` (string | null), `buildPath` (string | null), `githubId` (string | null), `branch` (string), `triggerType` ("push" | "tag"), `enableSubmodules`?, `watchPaths`? |
 | `application-saveGitlabProvider` | POST | `applicationId` (string), `gitlabBuildPath` (string | null), `gitlabOwner` (string | null), `gitlabRepository` (string | null), `gitlabId` (string | null), `gitlabProjectId` (number | null), `gitlabPathNamespace` (string | null), `gitlabBranch` (string), `enableSubmodules`?, `watchPaths`? |
