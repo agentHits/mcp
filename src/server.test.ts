@@ -268,7 +268,7 @@ describe("MCP server tools/list", () => {
 
       expect(apiClient.get).not.toHaveBeenCalled();
       expect(apiClient.post).toHaveBeenCalledTimes(1);
-      expect(apiClient.post).toHaveBeenCalledWith("/application.env.upsert", {
+      expect(apiClient.post).toHaveBeenCalledWith("/application/env/upsert", {
         applicationId: "app_1",
         variables: {
           REDIS_PASSWORD: "placeholder-secret-value",
