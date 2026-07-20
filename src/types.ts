@@ -1,4 +1,4 @@
-import type { ZodObject, ZodRawShape } from "zod";
+import type { ZodObject, ZodRawShape, ZodType } from "zod";
 
 export interface ToolAnnotations {
   title?: string;
@@ -6,6 +6,11 @@ export interface ToolAnnotations {
   destructiveHint?: boolean;
   idempotentHint?: boolean;
   openWorldHint?: boolean;
+}
+
+export interface ToolExecutionPolicy {
+  kind: "compose-env-upsert" | "compose-deploy-exact" | "deployment-reconcile";
+  maxAttempts: 3;
 }
 
 export interface ToolDefinition {
@@ -16,4 +21,6 @@ export interface ToolDefinition {
   path: string;
   schema: ZodObject<ZodRawShape>;
   annotations?: ToolAnnotations;
+  execution?: ToolExecutionPolicy;
+  outputSchema?: ZodType<unknown>;
 }

@@ -2,7 +2,7 @@
 
 > Auto-generated from the [Dokploy OpenAPI spec](https://docs.dokploy.com/openapi.json). Run `pnpm generate` to update.
 
-- **Total Tools**: 542
+- **Total Tools**: 545
 - **Categories**: 49
 
 ## Categories
@@ -15,9 +15,9 @@
 - [bitbucket](#bitbucket) (7 tools)
 - [certificates](#certificates) (5 tools)
 - [cluster](#cluster) (4 tools)
-- [compose](#compose) (31 tools)
+- [compose](#compose) (33 tools)
 - [customRole](#customRole) (6 tools)
-- [deployment](#deployment) (9 tools)
+- [deployment](#deployment) (10 tools)
 - [destination](#destination) (6 tools)
 - [docker](#docker) (12 tools)
 - [domain](#domain) (9 tools)
@@ -175,6 +175,8 @@
 
 | Tool | Method | Parameters |
 |------|--------|------------|
+| `compose_env_upsert` | POST | `composeId` (string), `variables` (object), `dryRun`?, `expectedRevision`? |
+| `compose_deploy_exact` | POST | `composeId` (string), `expectedRevision` (string), `idempotencyKey` (string) |
 | `compose-create` | POST | `name` (string), `environmentId` (string), +5 optional |
 | `compose-one` | GET | `composeId` (string) |
 | `compose-update` | POST | `composeId` (string), +43 optional |
@@ -222,6 +224,7 @@
 
 | Tool | Method | Parameters |
 |------|--------|------------|
+| `deployment_reconcile` | POST | `composeId` (string), `operationId` (string), `repair`? |
 | `deployment-all` | GET | `applicationId` (string) |
 | `deployment-allByCompose` | GET | `composeId` (string) |
 | `deployment-allByServer` | GET | `serverId` (string) |
@@ -849,6 +852,6 @@
 All tools include semantic annotations to help MCP clients understand their behavior:
 
 - **readOnlyHint**: GET endpoints that only retrieve data
-- **destructiveHint**: Operations that delete or remove resources
-- **idempotentHint**: Safe to repeat without side effects
+- **destructiveHint**: Mutations that delete, replace, deploy, or conditionally repair resources
+- **idempotentHint**: GET endpoints and exact deploy repeated with identical arguments only
 - **openWorldHint**: All tools interact with the external Dokploy API

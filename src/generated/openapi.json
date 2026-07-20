@@ -136,6 +136,526 @@
     "url": "https://docs.dokploy.com"
   },
   "paths": {
+    "/compose/env/upsert": {
+      "post": {
+        "operationId": "compose-env-upsert",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "composeId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "variables": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "dryRun": {
+                    "type": "boolean"
+                  },
+                  "expectedRevision": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "composeId",
+                  "variables"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "composeId": {
+                      "type": "string"
+                    },
+                    "changed": {
+                      "type": "boolean"
+                    },
+                    "revision": {
+                      "type": "string"
+                    },
+                    "dryRun": {
+                      "type": "boolean"
+                    },
+                    "variables": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "action": {
+                            "type": "string",
+                            "enum": [
+                              "created",
+                              "updated",
+                              "unchanged"
+                            ]
+                          },
+                          "secret": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "action",
+                          "secret"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "composeId",
+                    "changed",
+                    "revision",
+                    "dryRun",
+                    "variables"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.BAD_REQUEST"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization not provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.UNAUTHORIZED"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.FORBIDDEN"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compose/deploy/exact": {
+      "post": {
+        "operationId": "compose-deployExact",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "composeId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "expectedRevision": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$"
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "composeId",
+                  "expectedRevision",
+                  "idempotencyKey"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "composeId": {
+                      "type": "string"
+                    },
+                    "operationId": {
+                      "type": "string"
+                    },
+                    "sourceRevision": {
+                      "type": "string"
+                    },
+                    "resolvedRevision": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "accepted",
+                        "queued",
+                        "dispatch_unknown",
+                        "running",
+                        "succeeded",
+                        "failed"
+                      ]
+                    },
+                    "deduplicated": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "composeId",
+                    "operationId",
+                    "sourceRevision",
+                    "resolvedRevision",
+                    "status",
+                    "deduplicated"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.BAD_REQUEST"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization not provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.UNAUTHORIZED"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.FORBIDDEN"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deployment/reconcile": {
+      "post": {
+        "operationId": "deployment-reconcile",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "composeId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "repair": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "composeId",
+                  "operationId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "composeId": {
+                      "type": "string"
+                    },
+                    "operationId": {
+                      "type": "string"
+                    },
+                    "sourceRevision": {
+                      "type": "string"
+                    },
+                    "resolvedRevision": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "operationStatus": {
+                      "type": "string",
+                      "enum": [
+                        "accepted",
+                        "queued",
+                        "dispatch_unknown",
+                        "running",
+                        "succeeded",
+                        "failed"
+                      ]
+                    },
+                    "deployment": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "deploymentId": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "running",
+                                    "done",
+                                    "error",
+                                    "cancelled"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "startedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "finishedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "deploymentId",
+                            "status",
+                            "startedAt",
+                            "finishedAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "queue": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "active",
+                            "queue-empty",
+                            "queue-unavailable"
+                          ]
+                        },
+                        "reasonCode": {
+                          "type": "string",
+                          "enum": [
+                            "not-configured",
+                            "network-error",
+                            "remote-error",
+                            "invalid-response"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "state"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "repairPerformed": {
+                      "type": "boolean"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "checkedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "composeId",
+                    "operationId",
+                    "sourceRevision",
+                    "resolvedRevision",
+                    "operationStatus",
+                    "deployment",
+                    "queue",
+                    "repairPerformed",
+                    "createdAt",
+                    "updatedAt",
+                    "checkedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.BAD_REQUEST"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization not provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.UNAUTHORIZED"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.FORBIDDEN"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin.setupMonitoring": {
       "post": {
         "operationId": "admin-setupMonitoring",

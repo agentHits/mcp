@@ -49,7 +49,10 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error: AxiosError) => {
-    logger.error("Request interceptor error", { error: error.message });
+    logger.error("Request interceptor error", {
+      method: error.config?.method?.toUpperCase(),
+      url: error.config?.url,
+    });
     return Promise.reject(error);
   },
 );
@@ -95,13 +98,12 @@ apiClient.interceptors.response.use(
 // Helper Functions
 
 function handleServerError(response: AxiosResponse): void {
-  const { status, data, config } = response;
+  const { status, config } = response;
 
   const errorContext = {
     status,
     method: config?.method?.toUpperCase(),
     url: config?.url,
-    message: data?.message || data?.error || "Unknown server error",
   };
 
   switch (status) {
@@ -115,10 +117,7 @@ function handleServerError(response: AxiosResponse): void {
       logger.error("Resource not found", errorContext);
       break;
     case 422:
-      logger.error("Validation error", {
-        ...errorContext,
-        errors: data?.errors,
-      });
+      logger.error("Validation error", errorContext);
       break;
     case 500:
       logger.error("Internal server error", errorContext);
@@ -142,8 +141,8 @@ function handleNetworkError(
 
 function handleUnknownError(error: AxiosError): void {
   logger.error("Unknown error occurred", {
-    error: error.message,
-    stack: error.stack,
+    method: error.config?.method?.toUpperCase(),
+    url: error.config?.url,
   });
 }
 
