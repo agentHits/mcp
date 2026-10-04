@@ -296,7 +296,9 @@ export function createHandler(tool: ToolDefinition) {
       if (status === 409) {
         return ResponseFormatter.error(
           `Conflict while executing ${tool.name}`,
-          "The operation state changed; inspect or preview again before retrying",
+          tool.execution?.kind === "compose-env-upsert"
+            ? "The compose env revision is stale or changed concurrently. Call compose_env_upsert with dryRun=true and no expectedRevision to get the current revision, then retry with it."
+            : "The operation state changed; inspect or preview again before retrying",
         );
       }
 

@@ -737,6 +737,29 @@ describe("MCP server tools/list", () => {
     await client.close();
   });
 
+  it("tells the caller to re-preview for a fresh revision on a compose env conflict", async () => {
+    mocked(apiClient.post).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 409, data: { message: "remote-sensitive-conflict" } },
+    });
+    const client = await createConnectedClient();
+    const result = await client.callTool({
+      name: "compose_env_upsert",
+      arguments: {
+        composeId: "compose_1",
+        variables: { TOKEN: "submitted-value" },
+        dryRun: false,
+        expectedRevision: "env:stale",
+      },
+    });
+    await client.close();
+
+    const text = responseText(result);
+    expect(text).toContain("The compose env revision is stale or changed concurrently");
+    expect(text).toContain("dryRun=true and no expectedRevision");
+    expect(text).not.toContain("remote-sensitive-conflict");
+  });
+
   it("retries exact deploy at most three times with one byte-identical body and key", async () => {
     const noResponse = { isAxiosError: true, request: {}, code: "ETIMEDOUT" };
     const unavailable = { isAxiosError: true, response: { status: 503 } };

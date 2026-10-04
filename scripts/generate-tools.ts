@@ -61,7 +61,7 @@ const EXACT_PATH_POLICIES: Record<string, ExactPathPolicy> = {
     title: "Compose Env Upsert",
     tag: "compose",
     description:
-      "Safely preview or conditionally apply partial compose environment updates without full environment replacement.",
+      "Add or update individual compose env variables without replacing the whole env; all other variables and secrets are preserved and values are never returned. Step 1: call with dryRun=true and no expectedRevision to get 'revision'. Step 2: call with dryRun=false and expectedRevision set to that revision. On a revision conflict, repeat step 1.",
     execution: "compose-env-upsert",
   },
   "POST /compose/deploy/exact": {
