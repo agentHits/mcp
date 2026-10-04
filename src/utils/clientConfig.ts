@@ -58,17 +58,21 @@ export function parseCustomHeaders(rawHeaders: string | undefined): Record<strin
   return customHeaders;
 }
 
-class ConfigManager {
-  private static instance: ConfigManager;
+export class ConfigManager {
+  private static instance: ConfigManager | null = null;
   private config: Config | null = null;
 
   private constructor() {}
 
   static getInstance(): ConfigManager {
-    if (!ConfigManager.instance) {
+    if (ConfigManager.instance === null) {
       ConfigManager.instance = new ConfigManager();
     }
-    return ConfigManager.instance;
+    return ConfigManager.instance as ConfigManager;
+  }
+
+  static resetInstance(): void {
+    ConfigManager.instance = null;
   }
 
   getConfig(): Config {

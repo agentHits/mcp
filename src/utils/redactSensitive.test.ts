@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { DEFAULT_REDACTED_FIELDS, redactSensitive } from "./redactSensitive.js";
 
 const redact = <T>(data: T) => redactSensitive(data, DEFAULT_REDACTED_FIELDS);
@@ -41,10 +41,7 @@ describe("redactSensitive", () => {
       apps: [{ name: "web", env: "SECRET=1" }, { config: { registryPassword: "p" } }],
     });
     expect(result).toEqual({
-      apps: [
-        { name: "web", env: "[REDACTED]" },
-        { config: { registryPassword: "[REDACTED]" } },
-      ],
+      apps: [{ name: "web", env: "[REDACTED]" }, { config: { registryPassword: "[REDACTED]" } }],
     });
   });
 

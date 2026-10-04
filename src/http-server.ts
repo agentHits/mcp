@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { randomUUID } from "node:crypto";
 import type { HttpBindings } from "@hono/node-server";

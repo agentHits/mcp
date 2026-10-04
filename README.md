@@ -10,7 +10,7 @@ With **508 tools** across **49 categories**, this server provides complete cover
 
 ### Requirements
 
-- Node.js >= v18.0.0 (or Docker)
+- Bun >= v1.4.0 (or Docker)
 - Cursor, VS Code, Claude Desktop, or another MCP Client
 - A running Dokploy server instance
 
@@ -487,7 +487,7 @@ Built with **@modelcontextprotocol/sdk**, **TypeScript**, and **Zod** for type-s
 
 - **508 Tools** covering the entire Dokploy API
 - **Multiple Transports**: Stdio (default) and HTTP (Streamable HTTP + legacy SSE)
-- **Auto-generated Tools**: Tools are generated from the Dokploy OpenAPI spec via `pnpm generate:all`
+- **Auto-generated Tools**: Tools are generated from the Dokploy OpenAPI spec via `bun run generate:all`
 - **Tool Filtering**: Load only the categories you need via `DOKPLOY_ENABLED_TAGS`
 - **Robust Error Handling**: Centralized API client with interceptors and retry logic
 - **Type Safety**: Full TypeScript with Zod schema validation
@@ -500,19 +500,19 @@ Clone the project and install dependencies:
 ```bash
 git clone https://github.com/Dokploy/mcp.git
 cd mcp
-pnpm install
+bun install
 ```
 
 Build:
 
 ```bash
-pnpm build
+bun run build
 ```
 
 Regenerate tools from the Dokploy OpenAPI spec:
 
 ```bash
-pnpm generate:all
+bun run generate:all
 ```
 
 ### Local Configuration Example
@@ -521,8 +521,8 @@ pnpm generate:all
 {
   "mcpServers": {
     "dokploy-mcp": {
-      "command": "npx",
-      "args": ["tsx", "/path/to/mcp/src/index.ts"],
+      "command": "bun",
+      "args": ["/path/to/mcp/src/index.ts"],
       "env": {
         "DOKPLOY_URL": "https://your-dokploy-server.com",
         "DOKPLOY_API_KEY": "your-dokploy-api-token"
@@ -544,7 +544,7 @@ npx -y @modelcontextprotocol/inspector npx @dokploy/mcp
 
 1. Try adding `@latest` to the package name.
 
-2. Make sure you are using Node v18 or higher to have native fetch support with `npx`.
+2. Make sure you are using Bun v1.4 or higher; the server runs on the Bun runtime.
 
 3. Verify your `DOKPLOY_URL` and `DOKPLOY_API_KEY` environment variables are correctly set.
 

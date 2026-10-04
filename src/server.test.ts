@@ -1,16 +1,20 @@
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock apiClient before server.ts is imported — it calls getClientConfig() at
 // module level which requires DOKPLOY_URL/DOKPLOY_API_KEY env vars.
-vi.mock("./utils/apiClient.js", () => ({
-  default: { get: vi.fn(), post: vi.fn() },
-  setAuthToken: vi.fn(),
-  clearAuthToken: vi.fn(),
+mock.module("./utils/apiClient.js", () => ({
+  default: { get: mock(), post: mock() },
+  setAuthToken: mock(),
+  clearAuthToken: mock(),
 }));
+
+// bun:test has no vi.mocked(): module mocks above are already mock fns,
+// so this is a pass-through kept at old call sites.
+const mocked = <T>(value: T): T => value;
 
 const { default: apiClient } = await import("./utils/apiClient.js");
 const { generatedTools } = await import("./generated/tools.js");
@@ -40,7 +44,7 @@ describe("MCP server tools/list", () => {
   const originalDokployRedactFields = process.env.DOKPLOY_REDACT_FIELDS;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    mock.clearAllMocks();
     process.env.DOKPLOY_URL = "https://dokploy.example";
     process.env.DOKPLOY_API_KEY = "test-api-key";
     process.env.DOKPLOY_REDACT_ENV = "false";
@@ -184,7 +188,7 @@ describe("MCP server tools/list", () => {
   });
 
   it("routes deployment-readLogs calls to the deployment log API endpoint", async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({
+    mocked(apiClient.get).mockResolvedValue({
       data: "schedule stdout\nschedule stderr",
     });
 
@@ -381,7 +385,7 @@ describe("MCP server tools/list", () => {
   });
 
   it("routes application env upsert without full environment replacement or raw value output", async () => {
-    vi.mocked(apiClient.post).mockResolvedValue({
+    mocked(apiClient.post).mockResolvedValue({
       data: {
         applicationId: "app_1",
         changed: true,
@@ -399,7 +403,7 @@ describe("MCP server tools/list", () => {
     });
 
     const client = await createConnectedClient();
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = spyOn(console, "error").mockImplementation(() => {});
     try {
       const result = await client.callTool({
         name: "application-env-upsert",
@@ -430,7 +434,7 @@ describe("MCP server tools/list", () => {
         expect.anything(),
       );
 
-      const [, postBody] = vi.mocked(apiClient.post).mock.calls[0] as [
+      const [, postBody] = mocked(apiClient.post).mock.calls[0] as [
         string,
         Record<string, unknown>,
       ];
@@ -553,7 +557,7 @@ describe("MCP server tools/list", () => {
   });
 
   it("performs compose env conditional preview then one exact-revision write", async () => {
-    vi.mocked(apiClient.post)
+    mocked(apiClient.post)
       .mockResolvedValueOnce({
         data: {
           composeId: "compose_1",
@@ -607,7 +611,7 @@ describe("MCP server tools/list", () => {
   });
 
   it("runs compose env dry-run as one preview request", async () => {
-    vi.mocked(apiClient.post).mockResolvedValue({
+    mocked(apiClient.post).mockResolvedValue({
       data: {
         composeId: "compose_1",
         changed: false,
@@ -636,7 +640,7 @@ describe("MCP server tools/list", () => {
   });
 
   it("rejects compose env writes without a revision before any request or log", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = spyOn(console, "error").mockImplementation(() => {});
     const client = await createConnectedClient();
     consoleError.mockClear();
     try {
@@ -661,7 +665,7 @@ describe("MCP server tools/list", () => {
 
   it("rejects both secret placeholders at start, middle, and end before request or log", async () => {
     const values = FORBIDDEN_PLACEHOLDER_FIXTURES();
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = spyOn(console, "error").mockImplementation(() => {});
     const client = await createConnectedClient();
     consoleError.mockClear();
     try {
@@ -706,11 +710,11 @@ describe("MCP server tools/list", () => {
     ];
 
     for (const fixture of cases) {
-      vi.clearAllMocks();
+      mock.clearAllMocks();
       if (isRejectedFixture(fixture)) {
-        vi.mocked(apiClient.post).mockRejectedValueOnce(fixture);
+        mocked(apiClient.post).mockRejectedValueOnce(fixture);
       } else {
-        vi.mocked(apiClient.post).mockResolvedValueOnce(fixture);
+        mocked(apiClient.post).mockResolvedValueOnce(fixture);
       }
       const result = await client.callTool({
         name: "compose_env_upsert",
@@ -736,7 +740,7 @@ describe("MCP server tools/list", () => {
   it("retries exact deploy at most three times with one byte-identical body and key", async () => {
     const noResponse = { isAxiosError: true, request: {}, code: "ETIMEDOUT" };
     const unavailable = { isAxiosError: true, response: { status: 503 } };
-    vi.mocked(apiClient.post)
+    mocked(apiClient.post)
       .mockRejectedValueOnce(noResponse)
       .mockRejectedValueOnce(unavailable)
       .mockResolvedValueOnce({
@@ -763,7 +767,7 @@ describe("MCP server tools/list", () => {
     await client.close();
 
     expect(apiClient.post).toHaveBeenCalledTimes(3);
-    const bodies = vi.mocked(apiClient.post).mock.calls.map((call) => call[1]);
+    const bodies = mocked(apiClient.post).mock.calls.map((call) => call[1]);
     expect(bodies[1]).toBe(bodies[0]);
     expect(bodies[2]).toBe(bodies[0]);
     expect(JSON.stringify(bodies[1])).toBe(JSON.stringify(bodies[0]));
@@ -778,11 +782,11 @@ describe("MCP server tools/list", () => {
       { rejected: { isAxiosError: true } },
       { resolved: { data: { composeId: "compose_1", operationId: "operation_1" } } },
     ]) {
-      vi.clearAllMocks();
+      mock.clearAllMocks();
       if (fixture.rejected) {
-        vi.mocked(apiClient.post).mockRejectedValueOnce(fixture.rejected);
+        mocked(apiClient.post).mockRejectedValueOnce(fixture.rejected);
       } else if (fixture.resolved) {
-        vi.mocked(apiClient.post).mockResolvedValueOnce(fixture.resolved);
+        mocked(apiClient.post).mockResolvedValueOnce(fixture.resolved);
       }
       await client.callTool({
         name: "compose_deploy_exact",
@@ -821,8 +825,8 @@ describe("MCP server tools/list", () => {
     const client = await createConnectedClient();
 
     for (const data of fixtures) {
-      vi.clearAllMocks();
-      vi.mocked(apiClient.post).mockResolvedValueOnce({ data });
+      mock.clearAllMocks();
+      mocked(apiClient.post).mockResolvedValueOnce({ data });
       await client.callTool({
         name: "deployment_reconcile",
         arguments: { composeId: "compose_1", operationId: "operation_1", repair: true },
@@ -841,7 +845,7 @@ describe("MCP server tools/list", () => {
     const inspect = reconcileFixture();
     const client = await createConnectedClient();
 
-    vi.mocked(apiClient.post)
+    mocked(apiClient.post)
       .mockResolvedValueOnce({ data: inspect })
       .mockResolvedValueOnce({ data: { ...inspect, repairPerformed: true } });
     await client.callTool({
@@ -860,8 +864,8 @@ describe("MCP server tools/list", () => {
       repair: true,
     });
 
-    vi.clearAllMocks();
-    vi.mocked(apiClient.post)
+    mock.clearAllMocks();
+    mocked(apiClient.post)
       .mockResolvedValueOnce({ data: inspect })
       .mockRejectedValueOnce({ isAxiosError: true, response: { status: 503 } });
     await client.callTool({
@@ -882,7 +886,7 @@ describe("MCP server tools/list", () => {
       errorMessage: "forbidden-exception",
       queue: { state: "queue-unavailable", reasonCode: "remote-error", data: "forbidden-queue" },
     };
-    vi.mocked(apiClient.post).mockResolvedValueOnce({ data: response });
+    mocked(apiClient.post).mockResolvedValueOnce({ data: response });
     const client = await createConnectedClient();
     const result = await client.callTool({
       name: "deployment_reconcile",
@@ -914,7 +918,7 @@ describe("MCP server tools/list", () => {
     expect(fullSave?.annotations?.destructiveHint).toBe(true);
     expect(fullSave?.execution).toBeUndefined();
 
-    vi.mocked(apiClient.post).mockRejectedValue({
+    mocked(apiClient.post).mockRejectedValue({
       isAxiosError: true,
       response: { status: 503 },
     });

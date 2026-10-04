@@ -10,24 +10,24 @@
     "build"
   ],
   "scripts": {
-    "build": "pnpm run clean && tsc && chmod 755 build/index.js",
-    "dev": "tsc --watch",
-    "start:stdio": "node --env-file=.env build/index.js",
-    "start:http": "node --env-file=.env build/index.js --http",
-    "start:sse": "node --env-file=.env build/index.js --sse",
-    "dev:http": "pnpm run build && pnpm run start:http",
-    "dev:sse": "pnpm run build && pnpm run start:sse",
-    "fetch-openapi": "tsx scripts/fetch-openapi.ts",
-    "generate": "tsx scripts/generate-tools.ts",
-    "generate:all": "pnpm fetch-openapi && pnpm generate",
+    "build": "bun run clean && bun build src/index.ts --outdir ./build --target bun && chmod 755 build/index.js",
+    "dev": "bun --watch src/index.ts",
+    "start:stdio": "bun --env-file=.env build/index.js",
+    "start:http": "bun --env-file=.env build/index.js --http",
+    "start:sse": "bun --env-file=.env build/index.js --sse",
+    "dev:http": "bun run build && bun run start:http",
+    "dev:sse": "bun run build && bun run start:sse",
+    "fetch-openapi": "bun scripts/fetch-openapi.ts",
+    "generate": "bun scripts/generate-tools.ts",
+    "generate:all": "bun run fetch-openapi && bun run generate",
     "lint": "biome check",
-    "lint:fix": "biome check --fix",
+    "lint:fix": "biome check --write",
     "format": "biome format --write",
     "format:check": "biome format",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf build",
-    "precommit": "biome check && pnpm run type-check",
-    "test": "vitest run"
+    "precommit": "biome check && bun run type-check",
+    "test": "bun test"
   },
   "repository": {
     "type": "git",
@@ -56,9 +56,8 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.10",
     "@types/node": "^22.15.21",
+    "bun-types": "latest",
     "json-schema-to-zod": "^2.8.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.8.3",
-    "vitest": "^4.1.6"
+    "typescript": "^5.8.3"
   }
 }

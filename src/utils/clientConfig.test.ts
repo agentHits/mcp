@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { parseCustomHeaders } from "./clientConfig.js";
 
 describe("parseCustomHeaders", () => {
@@ -65,7 +65,8 @@ describe("getClientConfig", () => {
     process.env.DOKPLOY_API_KEY = "test-key";
     delete process.env.DOKPLOY_REDACT_ENV;
 
-    const { getClientConfig } = await import("./clientConfig.js");
+    const { ConfigManager, getClientConfig } = await import("./clientConfig.js");
+    ConfigManager.resetInstance();
     const config = getClientConfig();
 
     expect(config.redactEnv).toBe(true);
