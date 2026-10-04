@@ -131,7 +131,7 @@ function getProjectingResponseSchema(op: OperationObject): string | undefined {
     );
   };
 
-  return jsonSchemaToZod(removeAdditionalProperties(schema) as JsonSchema);
+  return jsonSchemaToZod(removeAdditionalProperties(schema) as JsonSchema, { zodVersion: 3 });
 }
 
 function formatTitle(operationId: string): string {
@@ -162,7 +162,7 @@ function getZodSchema(op: OperationObject, method: string, path: string): string
             },
           }
         : sourceSchema;
-    return customZodObjectSchema(schema) ?? jsonSchemaToZod(schema);
+    return customZodObjectSchema(schema) ?? jsonSchemaToZod(schema, { zodVersion: 3 });
   }
 
   if (op.parameters && op.parameters.length > 0) {
@@ -180,11 +180,14 @@ function getZodSchema(op: OperationObject, method: string, path: string): string
       }
     }
 
-    return jsonSchemaToZod({
-      type: "object",
-      properties,
-      ...(required.length > 0 ? { required } : {}),
-    });
+    return jsonSchemaToZod(
+      {
+        type: "object",
+        properties,
+        ...(required.length > 0 ? { required } : {}),
+      },
+      { zodVersion: 3 },
+    );
   }
 
   return "z.object({})";
@@ -264,7 +267,8 @@ function customZodObjectSchema(schema: JsonSchema): string | null {
   }
 
   const entries = propertyEntries.map(({ name, propSchema, customSchema }) => {
-    const propertySchema = customSchema ?? jsonSchemaToZod(propSchema as JsonSchema);
+    const propertySchema =
+      customSchema ?? jsonSchemaToZod(propSchema as JsonSchema, { zodVersion: 3 });
     return `${JSON.stringify(name)}: ${propertySchema}${requiredSet.has(name) ? "" : ".optional()"}`;
   });
 

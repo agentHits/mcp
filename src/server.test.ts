@@ -16,6 +16,11 @@ const { default: apiClient } = await import("./utils/apiClient.js");
 const { generatedTools } = await import("./generated/tools.js");
 const { createServer } = await import("./server.js");
 
+function countByTags(tags: string[]): number {
+  const wanted = new Set(tags.map((tag) => tag.toLowerCase()));
+  return generatedTools.filter((tool) => wanted.has(tool.tag.toLowerCase())).length;
+}
+
 const RECOVERY_PATHS = [
   "/compose/env/upsert",
   "/compose/deploy/exact",
@@ -40,6 +45,9 @@ describe("MCP server tools/list", () => {
     process.env.DOKPLOY_API_KEY = "test-api-key";
     process.env.DOKPLOY_REDACT_ENV = "false";
     delete process.env.DOKPLOY_REDACT_FIELDS;
+    delete process.env.DOKPLOY_ENABLED_TAGS;
+    delete process.env.DOKPLOY_DISABLED_TAGS;
+    delete process.env.DOKPLOY_TOOL_PRESET;
   });
 
   afterEach(() => {
@@ -66,6 +74,10 @@ describe("MCP server tools/list", () => {
     } else {
       process.env.DOKPLOY_REDACT_FIELDS = originalDokployRedactFields;
     }
+
+    delete process.env.DOKPLOY_ENABLED_TAGS;
+    delete process.env.DOKPLOY_DISABLED_TAGS;
+    delete process.env.DOKPLOY_TOOL_PRESET;
   });
 
   async function createConnectedClient() {
@@ -87,6 +99,64 @@ describe("MCP server tools/list", () => {
   it("returns tools", async () => {
     const tools = await getToolList();
     expect(tools.length).toBeGreaterThan(0);
+  });
+
+  it("returns all tools by default", async () => {
+    const tools = await getToolList();
+    expect(tools).toHaveLength(generatedTools.length);
+  });
+
+  it("supports DOKPLOY_TOOL_PRESET=minimal for clients sensitive to large toolsets", async () => {
+    process.env.DOKPLOY_TOOL_PRESET = "minimal";
+
+    const tools = await getToolList();
+    const tags = new Set(tools.map((tool) => tool.name.split("-")[0]));
+
+    expect(tools).toHaveLength(countByTags(["project", "application"]));
+    expect(tags).toEqual(new Set(["application", "project"]));
+  });
+
+  it("supports DOKPLOY_TOOL_PRESET=core for common application workflows", async () => {
+    process.env.DOKPLOY_TOOL_PRESET = "core";
+
+    const tools = await getToolList();
+    const tags = new Set(tools.map((tool) => tool.name.split("-")[0]));
+
+    expect(tools).toHaveLength(countByTags(["project", "server", "application"]));
+    expect(tags).toEqual(new Set(["application", "project", "server"]));
+  });
+
+  it("lets DOKPLOY_ENABLED_TAGS override presets", async () => {
+    process.env.DOKPLOY_TOOL_PRESET = "core";
+    process.env.DOKPLOY_ENABLED_TAGS = "project,application";
+
+    const tools = await getToolList();
+    const tags = new Set(tools.map((tool) => tool.name.split("-")[0]));
+
+    expect(tools).toHaveLength(countByTags(["project", "application"]));
+    expect(tags).toEqual(new Set(["application", "project"]));
+  });
+
+  it("excludes DOKPLOY_DISABLED_TAGS after selecting tools", async () => {
+    process.env.DOKPLOY_TOOL_PRESET = "deploy";
+    process.env.DOKPLOY_DISABLED_TAGS = "domain,deployment";
+
+    const tools = await getToolList();
+    const tags = new Set(tools.map((tool) => tool.name.split("-")[0]));
+
+    expect(tools).toHaveLength(
+      countByTags(["project", "environment", "server", "application", "compose"]),
+    );
+    expect(tags.has("domain")).toBe(false);
+    expect(tags.has("deployment")).toBe(false);
+  });
+
+  it("falls back to all tools for an unknown preset", async () => {
+    process.env.DOKPLOY_TOOL_PRESET = "unknown";
+
+    const tools = await getToolList();
+
+    expect(tools).toHaveLength(generatedTools.length);
   });
 
   it("exposes deployment-readLogs for schedule deployment log inspection", async () => {
@@ -179,6 +249,70 @@ describe("MCP server tools/list", () => {
       expect(
         found,
         `Tool "${tool.name}" has nested $schema keys at: ${found.join(", ")}`,
+      ).toHaveLength(0);
+    }
+  });
+
+  it("no tool inputSchema exposes regex lookaround patterns", async () => {
+    const tools = await getToolList();
+
+    function findLookaroundPatterns(obj: unknown, path = ""): string[] {
+      if (obj === null || typeof obj !== "object") return [];
+      if (Array.isArray(obj)) {
+        return obj.flatMap((item, i) => findLookaroundPatterns(item, `${path}[${i}]`));
+      }
+
+      const record = obj as Record<string, unknown>;
+      const found: string[] = [];
+      for (const [key, value] of Object.entries(record)) {
+        const currentPath = path ? `${path}.${key}` : key;
+        if (key === "pattern" && typeof value === "string" && /\(\?<?[=!]/.test(value)) {
+          found.push(currentPath);
+        }
+        found.push(...findLookaroundPatterns(value, currentPath));
+      }
+      return found;
+    }
+
+    for (const tool of tools) {
+      const found = findLookaroundPatterns(tool.inputSchema);
+      expect(
+        found,
+        `Tool "${tool.name}" exposes provider-incompatible lookaround patterns at: ${found.join(", ")}`,
+      ).toHaveLength(0);
+    }
+  });
+
+  it("no tool inputSchema exposes patterns invalid under strict regex syntax", async () => {
+    const tools = await getToolList();
+
+    function findStrictInvalidPatterns(obj: unknown, path = ""): string[] {
+      if (obj === null || typeof obj !== "object") return [];
+      if (Array.isArray(obj)) {
+        return obj.flatMap((item, i) => findStrictInvalidPatterns(item, `${path}[${i}]`));
+      }
+
+      const record = obj as Record<string, unknown>;
+      const found: string[] = [];
+      for (const [key, value] of Object.entries(record)) {
+        const currentPath = path ? `${path}.${key}` : key;
+        if (key === "pattern" && typeof value === "string") {
+          try {
+            new RegExp(value, "v");
+          } catch {
+            found.push(`${currentPath}: ${value}`);
+          }
+        }
+        found.push(...findStrictInvalidPatterns(value, currentPath));
+      }
+      return found;
+    }
+
+    for (const tool of tools) {
+      const found = findStrictInvalidPatterns(tool.inputSchema);
+      expect(
+        found,
+        `Tool "${tool.name}" exposes provider-incompatible patterns at: ${found.join(", ")}`,
       ).toHaveLength(0);
     }
   });
@@ -504,6 +638,7 @@ describe("MCP server tools/list", () => {
   it("rejects compose env writes without a revision before any request or log", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const client = await createConnectedClient();
+    consoleError.mockClear();
     try {
       const result = await client.callTool({
         name: "compose_env_upsert",
@@ -528,6 +663,7 @@ describe("MCP server tools/list", () => {
     const values = FORBIDDEN_PLACEHOLDER_FIXTURES();
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const client = await createConnectedClient();
+    consoleError.mockClear();
     try {
       for (const value of values) {
         const result = await client.callTool({
