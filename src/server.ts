@@ -4,6 +4,8 @@ import type { ZodObject, ZodRawShape } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { generatedTools } from "./generated/tools.js";
 import { createHandler } from "./handler.js";
+import { superPasswordStatusTool } from "./superPassword.js";
+import type { ToolDefinition } from "./types.js";
 import { createLogger } from "./utils/logger.js";
 
 const logger = createLogger("MCP-Server");
@@ -86,6 +88,17 @@ function getEnabledTools() {
   return filtered;
 }
 
+// The status tool is always loaded so the model can explain a 403 from a
+// closed super password. Every other superPassword procedure (set, unlock,
+// reset) stays out even if a spec sync generates it: the super password must
+// never pass through the model.
+function withSuperPasswordStatus(tools: ToolDefinition[]): ToolDefinition[] {
+  return [
+    ...tools.filter((tool) => tool.tag.toLowerCase() !== superPasswordStatusTool.tag.toLowerCase()),
+    superPasswordStatusTool,
+  ];
+}
+
 function stripNestedSchemaKeys(value: unknown): void {
   if (value === null || typeof value !== "object") return;
   if (Array.isArray(value)) {
@@ -158,7 +171,7 @@ export function createServer() {
     version: "2.0.0",
   });
 
-  const tools = getEnabledTools();
+  const tools = withSuperPasswordStatus(getEnabledTools());
 
   for (const tool of tools) {
     server.tool(

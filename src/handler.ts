@@ -1,3 +1,8 @@
+import {
+  getSuperPasswordDenial,
+  summarizeSuperPasswordStatus,
+  superPasswordDenialResponse,
+} from "./superPassword.js";
 import type { ToolDefinition } from "./types.js";
 import apiClient from "./utils/apiClient.js";
 import { getClientConfig } from "./utils/clientConfig.js";
@@ -227,6 +232,10 @@ async function executeTool(tool: ToolDefinition, input: Record<string, unknown>)
       return executeExactDeploy(tool, input);
     case "deployment-reconcile":
       return executeDeploymentReconcile(tool, input);
+    case "super-password-status": {
+      const response = await apiClient.get(tool.path);
+      return summarizeSuperPasswordStatus(response.data);
+    }
     default: {
       const response =
         tool.method === "GET"
@@ -281,6 +290,10 @@ export function createHandler(tool: ToolDefinition) {
         ...(status === undefined ? {} : { status }),
       });
 
+      const superPasswordDenial = getSuperPasswordDenial(error);
+      if (superPasswordDenial) {
+        return superPasswordDenialResponse(tool.name, superPasswordDenial);
+      }
       if (status === 401) {
         return ResponseFormatter.error(
           `Authentication failed for ${tool.name}`,

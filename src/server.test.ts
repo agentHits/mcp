@@ -20,9 +20,14 @@ const { default: apiClient } = await import("./utils/apiClient.js");
 const { generatedTools } = await import("./generated/tools.js");
 const { createServer } = await import("./server.js");
 
+// superPassword-status is loaded on top of every preset and tag filter.
+const ALWAYS_LOADED_TOOLS = 1;
+
 function countByTags(tags: string[]): number {
   const wanted = new Set(tags.map((tag) => tag.toLowerCase()));
-  return generatedTools.filter((tool) => wanted.has(tool.tag.toLowerCase())).length;
+  return (
+    generatedTools.filter((tool) => wanted.has(tool.tag.toLowerCase())).length + ALWAYS_LOADED_TOOLS
+  );
 }
 
 const RECOVERY_PATHS = [
@@ -107,7 +112,7 @@ describe("MCP server tools/list", () => {
 
   it("returns all tools by default", async () => {
     const tools = await getToolList();
-    expect(tools).toHaveLength(generatedTools.length);
+    expect(tools).toHaveLength(generatedTools.length + ALWAYS_LOADED_TOOLS);
   });
 
   it("supports DOKPLOY_TOOL_PRESET=minimal for clients sensitive to large toolsets", async () => {
@@ -117,7 +122,7 @@ describe("MCP server tools/list", () => {
     const tags = new Set(tools.map((tool) => tool.name.split("-")[0]));
 
     expect(tools).toHaveLength(countByTags(["project", "application"]));
-    expect(tags).toEqual(new Set(["application", "project"]));
+    expect(tags).toEqual(new Set(["application", "project", "superPassword"]));
   });
 
   it("supports DOKPLOY_TOOL_PRESET=core for common application workflows", async () => {
@@ -127,7 +132,7 @@ describe("MCP server tools/list", () => {
     const tags = new Set(tools.map((tool) => tool.name.split("-")[0]));
 
     expect(tools).toHaveLength(countByTags(["project", "server", "application"]));
-    expect(tags).toEqual(new Set(["application", "project", "server"]));
+    expect(tags).toEqual(new Set(["application", "project", "server", "superPassword"]));
   });
 
   it("lets DOKPLOY_ENABLED_TAGS override presets", async () => {
@@ -138,7 +143,7 @@ describe("MCP server tools/list", () => {
     const tags = new Set(tools.map((tool) => tool.name.split("-")[0]));
 
     expect(tools).toHaveLength(countByTags(["project", "application"]));
-    expect(tags).toEqual(new Set(["application", "project"]));
+    expect(tags).toEqual(new Set(["application", "project", "superPassword"]));
   });
 
   it("excludes DOKPLOY_DISABLED_TAGS after selecting tools", async () => {
@@ -160,7 +165,7 @@ describe("MCP server tools/list", () => {
 
     const tools = await getToolList();
 
-    expect(tools).toHaveLength(generatedTools.length);
+    expect(tools).toHaveLength(generatedTools.length + ALWAYS_LOADED_TOOLS);
   });
 
   it("exposes deployment-readLogs for schedule deployment log inspection", async () => {
@@ -758,6 +763,120 @@ describe("MCP server tools/list", () => {
     expect(text).toContain("The compose env revision is stale or changed concurrently");
     expect(text).toContain("dryRun=true and no expectedRevision");
     expect(text).not.toContain("remote-sensitive-conflict");
+  });
+
+  it("lists superPassword-status on top of any preset, and no other superPassword tool", async () => {
+    process.env.DOKPLOY_TOOL_PRESET = "minimal";
+
+    const tools = await getToolList();
+    const superPasswordTools = tools.filter(({ name }) => name.startsWith("superPassword"));
+
+    expect(superPasswordTools.map(({ name }) => name)).toEqual(["superPassword-status"]);
+  });
+
+  it("explains each super password denial with a fixed message instead of the server body", async () => {
+    const cases = [
+      {
+        serverMessage: "API key write access is locked. Open it in Profile → Super password.",
+        expected: "writes through the API key are locked",
+      },
+      {
+        serverMessage:
+          "This action needs the super password. Open access in Profile → Super password.",
+        expected: "needs open super password access",
+      },
+      {
+        serverMessage:
+          "This action needs a browser session with super password access open. API keys cannot perform it.",
+        expected: "can never perform it, even while access is open",
+      },
+    ];
+
+    for (const { serverMessage, expected } of cases) {
+      mock.clearAllMocks();
+      mocked(apiClient.post).mockRejectedValueOnce({
+        isAxiosError: true,
+        response: { status: 403, data: { message: serverMessage, code: "FORBIDDEN" } },
+      });
+      const client = await createConnectedClient();
+      const result = await client.callTool({
+        name: "compose-fetchSourceType",
+        arguments: { composeId: "compose_1" },
+      });
+      await client.close();
+
+      const text = responseText(result);
+      expect(result.isError).toBe(true);
+      expect(text).toContain("blocked by the Dokploy super password");
+      expect(text).toContain(expected);
+      expect(text).not.toContain(serverMessage);
+    }
+  });
+
+  it("still hides the body of any other 403", async () => {
+    mocked(apiClient.post).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 403, data: { message: "remote-sensitive-forbidden" } },
+    });
+    const client = await createConnectedClient();
+    const result = await client.callTool({
+      name: "compose-fetchSourceType",
+      arguments: { composeId: "compose_1" },
+    });
+    await client.close();
+
+    const text = responseText(result);
+    expect(text).toContain("The Dokploy API request failed with status 403");
+    expect(text).not.toContain("remote-sensitive-forbidden");
+    expect(text).not.toContain("super password");
+  });
+
+  it("returns the super password status without the hint or recovery channels", async () => {
+    const expiresAt = new Date(Date.now() + (17 * 60 + 42) * 60_000 + 30_000).toISOString();
+    mocked(apiClient.get).mockResolvedValueOnce({
+      data: {
+        isSet: true,
+        hint: "remote-hint-text",
+        active: true,
+        expiresAt,
+        lockedUntil: null,
+        durationMs: 86_400_000,
+        canManage: true,
+        viaApiKey: true,
+        recoveryChannels: [{ notificationId: "n1", name: "remote-channel-name", type: "telegram" }],
+      },
+    });
+    const client = await createConnectedClient();
+    const result = await client.callTool({ name: "superPassword-status", arguments: {} });
+    await client.close();
+
+    expect(apiClient.get).toHaveBeenCalledWith("/superPassword.status");
+    const text = responseText(result);
+    const parsed = JSON.parse(text);
+    expect(parsed.data).toMatchObject({
+      isSet: true,
+      active: true,
+      expiresAt,
+      timeLeft: "17 h 42 min",
+      apiKeyWrites: "allowed while access is open",
+    });
+    expect(text).not.toContain("remote-hint-text");
+    expect(text).not.toContain("remote-channel-name");
+    expect(text).not.toContain("recoveryChannels");
+  });
+
+  it("reports locked API-key writes while super password access is closed", async () => {
+    mocked(apiClient.get).mockResolvedValueOnce({
+      data: { isSet: true, active: false, expiresAt: null, lockedUntil: null },
+    });
+    const client = await createConnectedClient();
+    const result = await client.callTool({ name: "superPassword-status", arguments: {} });
+    await client.close();
+
+    const parsed = JSON.parse(responseText(result));
+    expect(parsed.data.active).toBe(false);
+    expect(parsed.data.timeLeft).toBeNull();
+    expect(parsed.data.apiKeyWrites).toStartWith("locked:");
   });
 
   it("retries exact deploy at most three times with one byte-identical body and key", async () => {
