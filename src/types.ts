@@ -9,7 +9,11 @@ export interface ToolAnnotations {
 }
 
 export interface ToolExecutionPolicy {
-  kind: "compose-env-upsert" | "compose-deploy-exact" | "deployment-reconcile";
+  kind:
+    | "compose-env-upsert"
+    | "compose-deploy-exact"
+    | "deployment-reconcile"
+    | "super-password-status";
   maxAttempts: 3;
 }
 
